@@ -6,7 +6,7 @@ It's a simple python script to generate c++ classes from .hh declaration.
 Example
 -------
 
-The following `Test.hh` file...
+The following __Test.hh__ file...
 
 ```cpp
 
@@ -61,7 +61,7 @@ std::string const & Test::getName() const
 Example
 -------
 
-You can try the dog.hh example at the root of this repository :)
+You can try the __dog.hh__ example at the root of this repository :)
 
 ```shell
 
