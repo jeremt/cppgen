@@ -1,0 +1,224 @@
+#!/usr/bin/env python
+
+import sys
+import re
+
+def usage():
+
+  print """
+  Synopsis:
+
+    cppgen <input> <output>
+
+  Description:
+
+    Generate a cpp file from a header input <file>.
+
+    Features:
+
+      - Generate constructor with initialization list.
+      - Generate destructor.
+      - Generate getters and setters.
+      - Generate other functions according return type.
+      - Generate cannonical constructors. (TODO)
+
+  Arguments:
+
+    <input>     The input c++ header file.
+    <output>    An optionnal output file for the generated cpp.
+  """
+
+  exit(0)
+
+def error(msg):
+
+  print """
+  Error: %s
+  """ % msg
+
+  exit(42)
+
+class Parser():
+
+  """
+  Initialize the parser.
+  """
+
+  def __init__(self, filename):
+
+    self.filename = filename
+    self.cl = self.getClass(filename)
+    if self.cl is None:
+      error("no class defined into this file.")
+    self.prefix = self.cl['className'] + "::"
+    self.scope = "()\n{\n}\n"
+
+  """
+  Run the parsing.
+  """
+
+  def run(self):
+
+    output = '#include "' + self.filename[:-3] + '.hh"\n\n'
+    for row in self.cl['rows']:
+      self.ok = False
+      output += self.constructor(row)
+      output += self.destructor(row)
+      output += self.getter(row)
+      output += self.setter(row)
+      if not self.ok:
+        output += self.func(row)
+    return output.strip()
+
+  """
+  Get class infos from the input file.
+  """
+
+  def getClass(self, filename):
+
+    lines = open(filename, 'r').read().split('\n')
+    cl = {"className": '', "rows": []}
+    inClass = False
+    for line in lines:
+      if line.find("}", 0, 2) == 0:
+        return cl
+      if inClass is True and line.find("{", 0, 2) != 0:
+        cl['rows'].append(line)
+      if line.find("class", 0, 5) == 0:
+        inClass = True
+        cl['className'] = line[5:].strip()
+    return None
+
+  """
+  Define return value according the return type.
+  """
+
+  def __getReturn(self, fn_type):
+    if 'void' == fn_type:
+      return ""
+    elif fn_type.find('*') is not -1:
+      return '  return NULL;\n'
+    elif fn_type.find('std::string') is not -1:
+      return '  return "";\n'
+    return "  // return an instance of `" + fn_type + "`\n"
+
+  """
+  Generate constructor.
+  """
+
+  def constructor(self, s):
+
+    expr = "^" + self.cl['className'] + "\((.+)?\);"
+    m = re.search(expr, s.strip())
+    if m is None:
+      return ""
+    if m.group(1) is None:
+      return self.prefix + self.cl['className'] + self.scope
+    res = self.prefix + self.cl['className']
+    res += "(" + m.group(1) + ")\n  : "
+    arr = [row.split(' ')[-1] for row in m.group(1).split(',')]
+    res += '\n  , '.join(["_" + row + "(" + row + ")" for row in arr])
+    res += "\n{\n}\n"
+    self.ok = True
+    return res + '\n'
+
+  """
+  Generate destructor.
+  """
+
+  def destructor(self, s):
+
+    if s.strip() != "~" + self.cl['className'] + "();":
+      return ""
+    self.ok = True
+    return self.prefix + "~" + self.cl['className'] + self.scope + '\n'
+
+  """
+  Generate getter.
+  """
+
+  def getter(self, s):
+
+    expr = ".+get([A-Z](\w+)?)\((.+)?\) const;"
+    m = re.search(expr, s.strip())
+    if not m:
+      return ""
+    s = m.group(0)[:-1]
+    pos = s.index("get" + m.group(1))
+    res = s[:pos] + self.prefix + s[pos:]
+    res += "\n{\n  return _"
+    res += m.group(1).lower()
+    res += ";\n}\n"
+    self.ok = True
+    return res + '\n'
+
+  """
+  Generate setter.
+  """
+
+  def setter(self, s):
+
+    expr = "void set([A-Z](\w+)?)\((.+)?\);"
+    m = re.search(expr, s.strip())
+    if not m:
+      return ""
+    s = m.group(0)[:-1]
+    var = m.group(1).lower()
+    pos = s.index("set" + m.group(1))
+    res = s[:pos] + self.prefix + s[pos:]
+    res += "\n{\n  _" + var + " = " + var + ";"
+    res += "\n}\n"
+    self.ok = True
+    return res + '\n'
+
+  """
+  Generate classic functions.
+  """
+
+  def func(self, s):
+
+    s = s.strip()
+    expr = "(.+)\((.+)?\)(.+)?;"
+    m = re.search(expr, s)
+    if not m:
+      return ""
+    arr = m.group(1).split(' ')
+    fn_name = arr.pop()
+    fn_type = ' '.join(arr)
+    if m.group(2) is not None:
+      fn_vars = [row.split(' ')[-1] for row in m.group(2).split(',')]
+    else:
+      fn_vars = None
+    pos = s.index(fn_name + "(")
+    s = s[:-1]
+    res = s[:pos] + self.prefix + s[pos:]
+    res += "\n{\n"
+    if fn_vars is not None:
+      res += '  (void)'
+      res += ';\n  (void)'.join([row for row in fn_vars])
+      res += ';\n'
+    res += self.__getReturn(fn_type)
+    res += "}\n"
+    return res + '\n'
+
+  """
+  Generate the copy constructor.
+  """
+
+  def copy(self, s):
+
+    return ""
+
+  """
+  Generate the assignation constructor (= operator).
+  """
+
+  def assign(self, s):
+
+    return ""
+
+if len(sys.argv) < 2:
+
+  usage()
+
+print Parser(sys.argv[1]).run()
