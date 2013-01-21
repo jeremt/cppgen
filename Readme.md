@@ -75,3 +75,8 @@ TODO
 - The corresponding sublime text plugin
 - Handle canonical classes
 - Ideas ?
+
+Bugs
+----
+
+- Constructor generate 2 times.

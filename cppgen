@@ -62,6 +62,8 @@ class Parser():
     output = '#include "' + self.filename[:-3] + '.hh"\n\n'
     for row in self.cl['rows']:
       self.ok = False
+      output += self.assign(row)
+      output += self.copy(row)
       output += self.constructor(row)
       output += self.destructor(row)
       output += self.getter(row)
@@ -94,12 +96,12 @@ class Parser():
   """
 
   def __getReturn(self, fn_type):
-    if 'void' == fn_type:
+    if 'void' is fn_type:
       return ""
+    elif 'std::string' is fn_type:
+      return '  return "";\n'
     elif fn_type.find('*') is not -1:
       return '  return NULL;\n'
-    elif fn_type.find('std::string') is not -1:
-      return '  return "";\n'
     return "  // return an instance of `" + fn_type + "`\n"
 
   """
@@ -110,7 +112,7 @@ class Parser():
 
     expr = "^" + self.cl['className'] + "\((.+)?\);"
     m = re.search(expr, s.strip())
-    if m is None:
+    if m is None or self.ok is True:
       return ""
     if m.group(1) is None:
       return self.prefix + self.cl['className'] + self.scope
@@ -160,7 +162,7 @@ class Parser():
 
     expr = "void set([A-Z](\w+)?)\((.+)?\);"
     m = re.search(expr, s.strip())
-    if not m:
+    if not m or self.ok is True:
       return ""
     s = m.group(0)[:-1]
     var = m.group(1).lower()
@@ -180,7 +182,7 @@ class Parser():
     s = s.strip()
     expr = "(.+)\((.+)?\)(.+)?;"
     m = re.search(expr, s)
-    if not m:
+    if not m or self.ok is True:
       return ""
     arr = m.group(1).split(' ')
     fn_name = arr.pop()
@@ -207,7 +209,17 @@ class Parser():
 
   def copy(self, s):
 
-    return ""
+    s = s.strip()
+    n = self.cl['className']
+    expr = n + "\(" + n + " const & (.+)?\);"
+    m = re.search(expr, s)
+    if not m or self.ok is True:
+      return ""
+    self.ok = True
+    res = self.prefix + s[:-1] + "\n{\n"
+    res += "  *this =  " + m.group(1) + ";"
+    res += "\n}\n"
+    return res + "\n"
 
   """
   Generate the assignation constructor (= operator).
@@ -215,7 +227,22 @@ class Parser():
 
   def assign(self, s):
 
-    return ""
+    s = s.strip()
+    n = self.cl['className']
+    expr = n + " & "
+    expr += "operator=\(" + n + " const & (.+)?\);"
+    m = re.search(expr, s)
+    if not m or self.ok is True:
+      return ""
+    self.ok = True
+    pos = s.index("operator=")
+    res = s[:-1]
+    res = res[:pos] + self.prefix + res[pos:]
+    res += "\n{\n"
+    res += "  if (this == &" + m.group(1) + ")\n"
+    res += "    ; // copy data from another object..."
+    res += "\n}\n"
+    return res + "\n"
 
 if len(sys.argv) < 2:
 
