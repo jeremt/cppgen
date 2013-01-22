@@ -73,10 +73,9 @@ TODO
 ----
 
 - The corresponding sublime text plugin
-- Handle canonical classes
+- Do not generate pure virtual classes
+- Handle namespaces and multi-classes
 - Ideas ?
 
 Bugs
 ----
-
-- Constructor generate 2 times.
